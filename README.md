@@ -10,6 +10,7 @@ This project implements an event-driven workflow using Inngest that responds to 
 - **Email Delivery**: Sends beautifully formatted HTML emails via Resend
 - **Robust Error Handling**: Implements comprehensive error handling with appropriate retry logic
 - **Delivery Status Tracking**: Monitors email delivery status to ensure successful communication
+- **Email Deliverability Optimization**: Includes both HTML and plain text versions of emails to improve deliverability and accessibility
 
 ## Setup Instructions
 

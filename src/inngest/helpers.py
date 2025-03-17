@@ -170,11 +170,18 @@ async def send_email_with_resend(
     # Generate a unique ID for tracking this email
     email_tracking_id = str(uuid.uuid4())
     
+    # Create a plain text version of the email by stripping HTML tags
+    # This is a simple approach - for more complex HTML, consider using a dedicated HTML-to-text converter
+    import re
+    plain_text = re.sub(r'<.*?>', '', content)
+    plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+    
     payload = {
         "from": "Movie Summary <peter@atriumhq.us>",
         "to": recipient_email,
         "subject": subject,
         "html": content,
+        "text": plain_text,  # Add plain text version
         "tags": [{"name": "email_id", "value": email_tracking_id}]
     }
     
