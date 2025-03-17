@@ -87,6 +87,12 @@ The project is structured as follows:
 - `src/inngest/functions.py`: Core function implementation for event handling
 - `src/inngest/helpers.py`: Utility functions for API interactions and email generation
 
+## Appropriate Outputs
+
+Below is an example of the email output for "The Shawshank Redemption". Note that the email is mobile responsive.
+
+![Shawshank Redemption Email](shawshank_redemption_screenshot.png)
+
 ## Error Handling
 
 The service implements comprehensive error handling:
