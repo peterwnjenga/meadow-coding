@@ -107,8 +107,9 @@ Sample test events are provided in the `README.md` file for testing different sc
 
 1. **Email Domain Configuration**: Configuring the email domains can be tricky, I purchased a throwaway domain and set up the MX and SPF records. It would be better if candidates were provided with a domain that they could use.
 
+## Sample Test Data
 
-Sample test data
+### 1. Standard Movie Lookup
 ```json
 {
   "name": "meadow_api/movie.watched",
@@ -119,7 +120,7 @@ Sample test data
 }
 ```
 
-Non exact name
+### 2. Partial title matching
 ```json
 {
   "name": "meadow_api/movie.watched",
@@ -130,8 +131,7 @@ Non exact name
 }
 ```
 
-
-Invalid/undeliverable email
+### 3. Invalid/undeliverable email
 ```json
 {
   "name": "meadow_api/movie.watched",
