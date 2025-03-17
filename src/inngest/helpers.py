@@ -1,29 +1,37 @@
-import inngest
-from urllib.parse import quote
-from openai import OpenAI
+"""
+Helper functions for the Inngest-based movie summary service.
+
+This module provides utility functions for OpenAI integration, email delivery
+via Resend, and HTML generation for movie summary emails.
+"""
+
+import asyncio
 import logging
 import os
-from dotenv import load_dotenv
-import asyncio
 import time
 import uuid
+from urllib.parse import quote
+
+import inngest
 import resend
+from dotenv import load_dotenv
+from openai import OpenAI
 
 from .client import inngest_client
 
+# Load environment variables
 load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
-# Set logging level
 logger.setLevel(logging.INFO)
-# Create handler if none exists
 if not logger.handlers:
     handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
+# API keys from environment variables
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -31,9 +39,16 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 # Initialize Resend client
 resend.api_key = RESEND_API_KEY
 
+
 async def summarize_plot_with_openai(plot_text: str) -> str:
     """
     Use OpenAI's GPT-4o-mini to summarize a movie plot.
+    
+    Args:
+        plot_text: The original movie plot text to summarize
+        
+    Returns:
+        str: A concise summary of the movie plot
     """
     client = OpenAI(api_key=OPENAI_API_KEY)
     
@@ -53,9 +68,16 @@ async def summarize_plot_with_openai(plot_text: str) -> str:
         logger.error(f"Error calling OpenAI API: {str(e)}")
         return f"Failed to summarize plot: {str(e)}"
 
+
 async def check_email_status(email_id: str) -> dict:
     """
     Check the delivery status of an email using Resend's API.
+    
+    Args:
+        email_id: The ID of the email to check
+        
+    Returns:
+        dict: Status information with success flag and data/error
     """
     try:
         # Since resend SDK is synchronous, run it in a thread pool
@@ -69,6 +91,7 @@ async def check_email_status(email_id: str) -> dict:
         logger.error(error_message)
         return {"success": False, "error": error_message}
 
+
 async def poll_email_status(email_id: str, max_duration_seconds: int = 30) -> dict:
     """
     Poll the email status for up to max_duration_seconds.
@@ -78,7 +101,10 @@ async def poll_email_status(email_id: str, max_duration_seconds: int = 30) -> di
         max_duration_seconds: Maximum time to poll in seconds (default: 30)
         
     Returns:
-        Dictionary with the final status information
+        dict: Dictionary with the final status information
+        
+    Raises:
+        inngest.NonRetriableError: If the email bounces
     """
     start_time = time.time()
     poll_interval = 2  # Start with 2 second interval
@@ -90,7 +116,7 @@ async def poll_email_status(email_id: str, max_duration_seconds: int = 30) -> di
             logger.warning(f"Failed to check email status: {status_result.get('error')}")
         else:
             from pprint import pformat
-            logger.info(f"Email status result: {pformat(status_result)}")
+            logger.debug(f"Email status result: {pformat(status_result)}")
             # Resend uses 'last_event' instead of 'status'
             status = status_result.get("data", {}).get("last_event")
             logger.info(f"Current email status: {status}")
@@ -119,7 +145,13 @@ async def poll_email_status(email_id: str, max_duration_seconds: int = 30) -> di
         "last_check": status_result.get("data", {})
     }
 
-async def send_email_with_resend(recipient_email: str, subject: str, content: str, wait_for_status: bool = False) -> dict:
+
+async def send_email_with_resend(
+    recipient_email: str, 
+    subject: str, 
+    content: str, 
+    wait_for_status: bool = False
+) -> dict:
     """
     Send an email using Resend's API and optionally wait for delivery status.
     
@@ -130,7 +162,10 @@ async def send_email_with_resend(recipient_email: str, subject: str, content: st
         wait_for_status: Whether to poll for delivery status (default: False)
         
     Returns:
-        Dictionary with send result and status information if requested
+        dict: Dictionary with send result and status information if requested
+        
+    Raises:
+        inngest.NonRetriableError: For non-retriable errors like invalid email
     """
     # Generate a unique ID for tracking this email
     email_tracking_id = str(uuid.uuid4())
@@ -143,7 +178,7 @@ async def send_email_with_resend(recipient_email: str, subject: str, content: st
         "tags": [{"name": "email_id", "value": email_tracking_id}]
     }
     
-    logger.info(f"Sending email to {recipient_email} with subject {subject}")
+    logger.info(f"Sending email to {recipient_email} with subject '{subject}'")
     try:
         # Use the Resend SDK to send the email
         result = await asyncio.to_thread(resend.Emails.send, payload)
@@ -175,7 +210,13 @@ async def send_email_with_resend(recipient_email: str, subject: str, content: st
             # Client errors are typically not retriable
             raise inngest.NonRetriableError(message=error_message)
 
-def generate_movie_email_html(movie_data: dict, plot: str, summary: str, movie_title: str) -> str:
+
+def generate_movie_email_html(
+    movie_data: dict, 
+    plot: str, 
+    summary: str, 
+    movie_title: str
+) -> str:
     """
     Generate HTML email content for movie summary.
     
@@ -186,10 +227,18 @@ def generate_movie_email_html(movie_data: dict, plot: str, summary: str, movie_t
         movie_title: Title of the movie (fallback if not in movie_data)
         
     Returns:
-        Formatted HTML string for email content
+        str: Formatted HTML string for email content
     """
-    # Helper function to create Google search links for names
     def create_search_links(names_str):
+        """
+        Helper function to create Google search links for names.
+        
+        Args:
+            names_str: Comma-separated string of names
+            
+        Returns:
+            str: HTML with linked names
+        """
         if not names_str or names_str == "N/A":
             return "N/A"
         
@@ -198,13 +247,35 @@ def generate_movie_email_html(movie_data: dict, plot: str, summary: str, movie_t
         
         for name in names:
             search_query = quote(f"{name} movie")
-            linked_names.append(f'<a href="https://www.google.com/search?q={search_query}" target="_blank">{name}</a>')
+            linked_names.append(
+                f'<a href="https://www.google.com/search?q={search_query}" '
+                f'target="_blank">{name}</a>'
+            )
         
         return ", ".join(linked_names)
     
     # Create linked versions of actors and directors
     linked_directors = create_search_links(movie_data.get('Director', 'N/A'))
     linked_actors = create_search_links(movie_data.get('Actors', 'N/A'))
+    
+    # Generate poster HTML based on availability
+    if movie_data.get("Poster") and movie_data.get("Poster") != "N/A":
+        poster_html = f'<img src="{movie_data.get("Poster")}" alt="Movie poster">'
+    else:
+        poster_html = (
+            '<div style="width:200px;height:300px;background:#eee;display:flex;'
+            'align-items:center;justify-content:center;border-radius:4px;">'
+            'No poster available</div>'
+        )
+    
+    # Generate ratings HTML
+    ratings_html = []
+    if movie_data.get('imdbRating') and movie_data.get('imdbRating') != "N/A":
+        ratings_html.append(f"IMDb: {movie_data.get('imdbRating')}")
+    if movie_data.get('Metascore') and movie_data.get('Metascore') != "N/A":
+        ratings_html.append(f"Metascore: {movie_data.get('Metascore')}")
+    
+    ratings_display = " | ".join(ratings_html) if ratings_html else "No ratings available"
     
     return f"""
     <html>
@@ -232,7 +303,7 @@ def generate_movie_email_html(movie_data: dict, plot: str, summary: str, movie_t
             
             <div class="movie-card">
                 <div class="poster">
-                    {f'<img src="{movie_data.get("Poster")}" alt="Movie poster">' if movie_data.get("Poster") and movie_data.get("Poster") != "N/A" else '<div style="width:200px;height:300px;background:#eee;display:flex;align-items:center;justify-content:center;border-radius:4px;">No poster available</div>'}
+                    {poster_html}
                 </div>
                 
                 <div class="details">
@@ -247,8 +318,7 @@ def generate_movie_email_html(movie_data: dict, plot: str, summary: str, movie_t
                     
                     <div class="ratings">
                         <strong>Ratings:</strong><br>
-                        {f"IMDb: {movie_data.get('imdbRating', 'N/A')}" if movie_data.get('imdbRating') and movie_data.get('imdbRating') != "N/A" else ""}
-                        {f" | Metascore: {movie_data.get('Metascore', 'N/A')}" if movie_data.get('Metascore') and movie_data.get('Metascore') != "N/A" else ""}
+                        {ratings_display}
                     </div>
                 </div>
             </div>
